@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import os
 
 app = Flask(__name__)
 CORS(app)  # Allow frontend to communicate with backend
@@ -9,6 +10,11 @@ GRADE_POINTS = {
     "A": 12, "A-": 11, "B+": 10, "B": 9, "B-": 8,
     "C+": 7, "C": 6, "C-": 5, "D": 3, "E": 0
 }
+
+# Health check route for Render (Prevents "Not Found" error)
+@app.route('/')
+def home():
+    return "Hello from Flask! API is live.", 200
 
 @app.route('/calculate_gpa', methods=['POST'])
 def calculate_gpa():
@@ -62,9 +68,6 @@ def calculate_gpa():
         "cumulative_gpa": cumulative_gpa
     })
 
-import os
-
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))  # Default port for Render
     app.run(host='0.0.0.0', port=port, debug=True)
-
