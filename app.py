@@ -5,71 +5,42 @@ import os
 app = Flask(__name__)
 CORS(app)  # Allow frontend to communicate with backend
 
-# GPA Quality Points Mapping
-GRADE_POINTS = {
-    "A": 12, "A-": 11, "B+": 10, "B": 9, "B-": 8,
-    "C+": 7, "C": 6, "C-": 5, "D": 3, "E": 0
-}
-
-# Health check route for Render (Prevents "Not Found" error)
+# ✅ **Health check route to prevent "Not Found" error**
 @app.route('/')
 def home():
     return "Hello from Flask! API is live.", 200
 
+# ✅ **GPA Calculation API**
 @app.route('/calculate_gpa', methods=['POST'])
 def calculate_gpa():
     data = request.json
-    terms = data.get("terms", {})
+    if not data or "terms" not in data:
+        return jsonify({"error": "Missing data"}), 400
 
-    if not terms:
-        return jsonify({"error": "No terms provided"}), 400
+    terms = data["terms"]
+    quality_points = 0
+    total_courses = 0
 
-    total_quality_points = 0
-    total_gpa_hours = 0
+    grade_mapping = {
+        "A": 12, "A-": 11, "B+": 10, "B": 9, "B-": 8,
+        "C+": 7, "C": 6, "C-": 5, "D": 3, "E": 0
+    }
+
     term_gpas = {}
 
-    two_course_terms = 0
-    four_course_terms = 0
-
     for term, grades in terms.items():
-        if grades == "Off-Term":
-            term_gpas[term] = "Off-Term"
-            continue
+        term_qp = sum(grade_mapping.get(grade, 0) for grade in grades)
+        term_courses = len(grades)
+        if term_courses > 0:
+            term_gpas[term] = round((term_qp / term_courses) / 3, 2)
+            quality_points += term_qp
+            total_courses += term_courses
 
-        if not grades or len(grades) < 2:
-            term_gpas[term] = "Invalid (Must have at least 2 courses)"
-            continue
+    cumulative_gpa = round((quality_points / total_courses) / 3, 2) if total_courses > 0 else 0
 
-        if len(grades) == 2:
-            two_course_terms += 1
-        if len(grades) == 4:
-            four_course_terms += 1
+    return jsonify({"cumulative_gpa": cumulative_gpa, "term_gpas": term_gpas})
 
-        term_quality_points = sum(GRADE_POINTS.get(grade, 0) for grade in grades)
-        term_gpa_hours = len(grades)
-
-        term_gpa = round((term_quality_points / term_gpa_hours) / 3, 2)
-        term_gpas[term] = term_gpa
-
-        total_quality_points += term_quality_points
-        total_gpa_hours += term_gpa_hours
-
-    # Enforce term limits
-    if two_course_terms > 3:
-        return jsonify({"error": "You can only have a maximum of 3 two-course terms"}), 400
-    if four_course_terms > 4:
-        return jsonify({"error": "You can only have a maximum of 4 four-course terms"}), 400
-
-    # Calculate cumulative GPA
-    cumulative_gpa = round((total_quality_points / total_gpa_hours) / 3, 2) if total_gpa_hours > 0 else 0
-
-    return jsonify({
-        "term_gpas": term_gpas,
-        "cumulative_gpa": cumulative_gpa
-    })
-
-import os
-
+# ✅ **Ensure Render uses the correct port**
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))  # Default Render port
+    port = int(os.environ.get("PORT", 10000))  # Render's environment variable
     app.run(host='0.0.0.0', port=port)
